@@ -1,11 +1,16 @@
 package org.example;
 
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -36,7 +41,28 @@ public class Main {
                 .userAgent(USER_AGENT)
                 .get();
             final List<String> fileDownloadUrls = getFileDownloadUrls(page);
-            //todo download here
+            downloadFiles(fileDownloadUrls);
+        }
+    }
+
+    private static void downloadFiles(final List<String> fileDownloadUrls) throws IOException {
+        for (String url : fileDownloadUrls) {
+            byte[] w = Jsoup.connect(url)
+                .userAgent(USER_AGENT)
+                .maxBodySize(0)
+                .timeout(300000)
+                .header("Cache-Control", "max-age=0")
+                .ignoreContentType(true)
+                .execute()
+                .bodyAsBytes(); //todo возвращает странную строку
+
+            String savedFileName = "qwe"; //todo нужно сохранять название файла
+            if (!savedFileName.endsWith(".rar")) {
+                savedFileName.concat(".rar");
+            }
+            FileOutputStream fos = new FileOutputStream(savedFileName);//todo создавать папочку и сохранять туда
+            fos.write(w);
+            fos.close();
         }
     }
 }
