@@ -1,13 +1,16 @@
 package org.example;
 
+import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
-import static org.example.Constants.ROOT_URL;
+import static java.util.stream.IntStream.range;
+import static org.example.Constants.*;
 
 public class ElementFinder {
     private ElementFinder() {
@@ -23,7 +26,7 @@ public class ElementFinder {
         return listWithPageUrls.children();
     }
 
-    public static String getPageHref(final Element element){
+    public static String getPageHref(final Element element) {
         return element.select("a")
             .get(0)
             .attr("href");
@@ -44,7 +47,7 @@ public class ElementFinder {
             }
 
             final Elements lineHeader = row.get(0)
-                    .select("p");
+                .select("p");
 
             if (!lineHeader.isEmpty() && lineHeader.get(0).text().equals("4.2")) {
                 fileDownloadUrls.add(row.get(1)
@@ -74,5 +77,22 @@ public class ElementFinder {
                 .attr("href"));
         }
         return fileDownloadUrls;
+    }
+
+
+    public static List<String> getPageUrls() throws IOException {
+        System.out.println("Начинаем процесс парсинга файлов.");
+        final Document mainPage = Jsoup.connect(MAIN_URL)
+            .userAgent(USER_AGENT)
+            .referrer(REFERRER)
+            .get();
+        System.out.println("Успешное подключение на главную страницу");
+
+        final Elements listSchemas = getSchemas(mainPage);
+        final List<String> mainPageUrls = range(0, listSchemas.size())
+            .mapToObj(index -> getPageHref(listSchemas.get(index)))
+            .toList();
+        System.out.printf("Найдено %d страниц для поиска файлов%n", mainPageUrls.size());
+        return mainPageUrls;
     }
 }
