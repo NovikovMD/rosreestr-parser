@@ -1,12 +1,15 @@
 package org.example;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.KeyManagementException;
@@ -75,23 +78,20 @@ public class Main {
         if (!fileUrl.startsWith("http://") && !fileUrl.startsWith("https://")) {
             fileUrl = ROOT_URL + fileUrl;
         }
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(fileUrl);
+            request.addHeader("User-Agent", USER_AGENT);
+            request.addHeader("Accept", "application/octet-stream");
+            request.addHeader("Referer", REFERRER);
 
-        final URL url = new URL(fileUrl);
-        final HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestProperty("User-Agent", USER_AGENT);
-        connection.setRequestProperty("Accept", "application/octet-stream");
-        connection.setRequestProperty("Referer", REFERRER);
-        connection.setRequestMethod("GET");
-
-        try (InputStream in = connection.getInputStream()) {
-            Files.copy(in, Paths.get(fileName), REPLACE_EXISTING);
-        } catch (IOException e) {
-            System.err.printf("Сервер вернул код %d для URL: %s%n",
-                connection.getResponseCode(),
-                fileUrl);
-            e.printStackTrace();
-        } finally {
-            connection.disconnect();
+            try (CloseableHttpResponse response = httpClient.execute(request)) {
+                HttpEntity entity = response.getEntity();
+                if (entity != null) {
+                    try (InputStream in = entity.getContent()) {
+                        Files.copy(in, Paths.get(fileName), REPLACE_EXISTING);
+                    }
+                }
+            }
         }
     }
 }
