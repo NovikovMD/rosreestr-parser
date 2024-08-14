@@ -1,5 +1,8 @@
 package org.example;
 
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -13,7 +16,7 @@ public class Configuration {
     private Configuration() {
     }
 
-    public static void trustAllCertificates() throws NoSuchAlgorithmException, KeyManagementException {
+    public static SSLConnectionSocketFactory trustAllCertificates() throws NoSuchAlgorithmException, KeyManagementException {
         final TrustManager[] trustAllCerts = new TrustManager[]{
             new X509TrustManager() {
                 public X509Certificate[] getAcceptedIssuers() {
@@ -28,11 +31,12 @@ public class Configuration {
             }
         };
 
-        final SSLContext sc = SSLContext.getInstance("TLS");
+        final SSLContext sc = SSLContext.getInstance("SSL");
         sc.init(null, trustAllCerts, new SecureRandom());
         HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
 
         // ignore hostname verification
         HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
+        return new SSLConnectionSocketFactory(sc, NoopHostnameVerifier.INSTANCE);
     }
 }

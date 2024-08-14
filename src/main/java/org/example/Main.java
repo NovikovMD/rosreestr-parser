@@ -3,6 +3,7 @@ package org.example;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.jsoup.Jsoup;
@@ -24,12 +25,7 @@ import static org.example.ElementFinder.getPageUrls;
 
 public class Main {
     public static void main(String[] args) throws NoSuchAlgorithmException, KeyManagementException, IOException {
-        try {
-            trustAllCertificates();
-        } catch (KeyManagementException | NoSuchAlgorithmException exception) {
-            System.err.println("Ошибка установки конфигов подключения");
-            throw exception;
-        }
+        var fact = trustAllCertificates();
 
         final List<String> mainPageUrls;
         try {
@@ -52,20 +48,19 @@ public class Main {
                 }
 
                 final List<String> fileDownloadUrls = getFileDownloadUrls(page);
-                downloadFiles(fileDownloadUrls);
+                downloadFiles(fileDownloadUrls, fact);
                 return fileDownloadUrls.size();
             })
-            .reduce((integer, integer2) -> integer + integer)
-            .orElse(0);
+            .reduce(0, (integer, integer2) -> integer + integer);
         System.out.println("Было загружено " + counter + " файлов");
     }
 
-    private static void downloadFiles(List<String> fileUrls) {
+    private static void downloadFiles(List<String> fileUrls, SSLConnectionSocketFactory fact) {
         fileUrls.forEach(fileUrl -> {
             try {
                 final String fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
                 System.out.printf("Начало загрузки файла %s%n", fileName);
-                downloadFile(fileUrl, fileName);
+                downloadFile(fileUrl, fileName, fact);
                 System.out.printf("Файл %s успешно загружен%n", fileName);
             } catch (IOException e) {
                 System.err.printf("Ошибка при загрузке файла: %s%n", fileUrl);
@@ -74,11 +69,14 @@ public class Main {
         });
     }
 
-    private static void downloadFile(String fileUrl, String fileName) throws IOException {
+    private static void downloadFile(String fileUrl, String fileName, SSLConnectionSocketFactory fact) throws IOException {
         if (!fileUrl.startsWith("http://") && !fileUrl.startsWith("https://")) {
             fileUrl = ROOT_URL + fileUrl;
         }
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+        try (CloseableHttpClient httpClient = HttpClients.custom()
+            .setSSLSocketFactory(fact)
+            .build()) {
+
             HttpGet request = new HttpGet(fileUrl);
             request.addHeader("User-Agent", USER_AGENT);
             request.addHeader("Accept", "application/octet-stream");
