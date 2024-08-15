@@ -11,11 +11,14 @@ import org.jsoup.nodes.Document;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static org.example.Configuration.trustAllCertificates;
@@ -68,7 +71,7 @@ public class Main {
         });
     }
 
-    private static void downloadFile(String fileUrl, String fileName, SSLConnectionSocketFactory fact) throws IOException {
+    private static void downloadFile(String fileUrl, String defaultFileName, SSLConnectionSocketFactory fact) throws IOException {
         if (!fileUrl.startsWith("http://") && !fileUrl.startsWith("https://")) {
             fileUrl = ROOT_URL + fileUrl.trim();
         }
@@ -83,10 +86,24 @@ public class Main {
 
             try (CloseableHttpResponse response = httpClient.execute(request)) {
                 HttpEntity entity = response.getEntity();
-                if (entity != null) {
-                    try (InputStream in = entity.getContent()) {
-                        Files.copy(in, Paths.get(fileName), REPLACE_EXISTING);
+                String fileName = defaultFileName;
+
+                String contentDisposition = response.getFirstHeader("Content-Disposition") != null
+                    ? response.getFirstHeader("Content-Disposition").getValue() : null;
+
+                if (contentDisposition != null) {
+                    Pattern pattern = Pattern.compile("filename=\"?([^\";]*)\"?");
+                    Matcher matcher = pattern.matcher(contentDisposition);
+                    if (matcher.find()) {
+                        fileName = matcher.group(1);
                     }
+                } else {
+                    URI uri = URI.create(fileUrl.replace(" ", "%20"));
+                    fileName = Paths.get(uri.getPath()).getFileName().toString();
+                }
+
+                try (InputStream in = entity.getContent()) {
+                    Files.copy(in, Paths.get(fileName.replace("%2", "_")), REPLACE_EXISTING);
                 }
             }
         }
