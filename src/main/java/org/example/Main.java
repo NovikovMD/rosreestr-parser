@@ -35,23 +35,22 @@ public class Main {
             throw exception;
         }
 
-        final int counter = mainPageUrls.stream()
-            .map(pageUrl -> {
-                final Document page;
-                try {
-                    page = Jsoup.connect(ROOT_URL + pageUrl)
-                        .userAgent(USER_AGENT)
-                        .get();
-                } catch (IOException e) {
-                    System.err.printf("Ошибка подключения на страницу %s%n", ROOT_URL + pageUrl);
-                    throw new RuntimeException(e);
-                }
+        var counter = 0;
+        for (String pageUrl : mainPageUrls) {
+            final Document page;
+            try {
+                page = Jsoup.connect(ROOT_URL + pageUrl)
+                    .userAgent(USER_AGENT)
+                    .get();
+            } catch (IOException e) {
+                System.err.printf("Ошибка подключения на страницу %s%n", ROOT_URL + pageUrl);
+                throw new RuntimeException(e);
+            }
 
-                final List<String> fileDownloadUrls = getFileDownloadUrls(page);
-                downloadFiles(fileDownloadUrls, fact);
-                return fileDownloadUrls.size();
-            })
-            .reduce(0, (integer, integer2) -> integer + integer);
+            final List<String> fileDownloadUrls = getFileDownloadUrls(page);
+            downloadFiles(fileDownloadUrls, fact);
+            counter += fileDownloadUrls.size();
+        }
         System.out.println("Было загружено " + counter + " файлов");
     }
 
@@ -71,13 +70,13 @@ public class Main {
 
     private static void downloadFile(String fileUrl, String fileName, SSLConnectionSocketFactory fact) throws IOException {
         if (!fileUrl.startsWith("http://") && !fileUrl.startsWith("https://")) {
-            fileUrl = ROOT_URL + fileUrl;
+            fileUrl = ROOT_URL + fileUrl.trim();
         }
         try (CloseableHttpClient httpClient = HttpClients.custom()
             .setSSLSocketFactory(fact)
             .build()) {
 
-            HttpGet request = new HttpGet(fileUrl);
+            HttpGet request = new HttpGet(fileUrl.replace(" ", "%20"));
             request.addHeader("User-Agent", USER_AGENT);
             request.addHeader("Accept", "application/octet-stream");
             request.addHeader("Referer", REFERRER);
