@@ -28,7 +28,7 @@ import static org.example.ElementFinder.getPageUrls;
 
 public class Main {
     public static void main(String[] args) throws NoSuchAlgorithmException, KeyManagementException, IOException {
-        var fact = trustAllCertificates();
+        final SSLConnectionSocketFactory socketFactory = trustAllCertificates();
 
         final List<String> mainPageUrls;
         try {
@@ -39,30 +39,30 @@ public class Main {
         }
 
         var counter = 0;
-        for (String pageUrl : mainPageUrls) {
+        for (final String pageUrl : mainPageUrls) {
             final Document page;
             try {
                 page = Jsoup.connect(ROOT_URL + pageUrl)
                     .userAgent(USER_AGENT)
                     .get();
-            } catch (IOException e) {
-                System.err.printf("Ошибка подключения на страницу %s%n", ROOT_URL + pageUrl);
-                throw new RuntimeException(e);
+            } catch (IOException exception) {
+                System.err.printf("Ошибка подключения на страницу %s%n", pageUrl);
+                throw exception;
             }
 
             final List<String> fileDownloadUrls = getFileDownloadUrls(page);
-            downloadFiles(fileDownloadUrls, fact);
+            downloadFiles(fileDownloadUrls, socketFactory);
             counter += fileDownloadUrls.size();
         }
         System.out.println("Было загружено " + counter + " файлов");
     }
 
-    private static void downloadFiles(List<String> fileUrls, SSLConnectionSocketFactory fact) {
+    private static void downloadFiles(List<String> fileUrls, SSLConnectionSocketFactory socketFactory) {
         fileUrls.forEach(fileUrl -> {
             try {
                 final String fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
                 System.out.printf("Начало загрузки файла %s%n", fileName);
-                downloadFile(fileUrl, fileName, fact);
+                downloadFile(fileUrl, fileName, socketFactory);
                 System.out.printf("Файл %s успешно загружен%n", fileName);
             } catch (IOException e) {
                 System.err.printf("Ошибка при загрузке файла: %s%n", fileUrl);
@@ -71,41 +71,43 @@ public class Main {
         });
     }
 
-    private static void downloadFile(String fileUrl, String defaultFileName, SSLConnectionSocketFactory fact) throws IOException {
+    private static void downloadFile(String fileUrl, String defaultFileName, SSLConnectionSocketFactory socketFactory) throws IOException {
         if (!fileUrl.startsWith("http://") && !fileUrl.startsWith("https://")) {
-            fileUrl = ROOT_URL + fileUrl.trim();
+            fileUrl = ROOT_URL + fileUrl.trim().replace(" ", "%20");
         }
         try (CloseableHttpClient httpClient = HttpClients.custom()
-            .setSSLSocketFactory(fact)
+            .setSSLSocketFactory(socketFactory)
             .build()) {
 
-            HttpGet request = new HttpGet(fileUrl.replace(" ", "%20"));
+            HttpGet request = new HttpGet(fileUrl);
             request.addHeader("User-Agent", USER_AGENT);
             request.addHeader("Accept", "application/octet-stream");
             request.addHeader("Referer", REFERRER);
 
-            try (CloseableHttpResponse response = httpClient.execute(request)) {
-                HttpEntity entity = response.getEntity();
-                String fileName = defaultFileName;
-
-                String contentDisposition = response.getFirstHeader("Content-Disposition") != null
-                    ? response.getFirstHeader("Content-Disposition").getValue() : null;
-
-                if (contentDisposition != null) {
-                    Pattern pattern = Pattern.compile("filename=\"?([^\";]*)\"?");
-                    Matcher matcher = pattern.matcher(contentDisposition);
-                    if (matcher.find()) {
-                        fileName = matcher.group(1);
-                    }
-                } else {
-                    URI uri = URI.create(fileUrl.replace(" ", "%20"));
-                    fileName = Paths.get(uri.getPath()).getFileName().toString();
-                }
+            try (final CloseableHttpResponse response = httpClient.execute(request)) {
+                final HttpEntity entity = response.getEntity();
+                final String fileName = getFileName(fileUrl, response, defaultFileName);
 
                 try (InputStream in = entity.getContent()) {
-                    Files.copy(in, Paths.get(fileName.replace("%2", "_")), REPLACE_EXISTING);
+                    Files.copy(in, Paths.get(fileName.replace("%2F", "_")), REPLACE_EXISTING);
                 }
             }
         }
+    }
+
+    private static String getFileName(String fileUrl, CloseableHttpResponse response, String defaultName) {
+        final String contentDisposition = response.getFirstHeader("Content-Disposition") != null
+            ? response.getFirstHeader("Content-Disposition").getValue()
+            : null;
+
+        if (contentDisposition != null) {
+            final Matcher matcher = Pattern.compile("filename=\"?([^\";]*)\"?").matcher(contentDisposition);
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        } else {
+            return Paths.get(URI.create(fileUrl).getPath()).getFileName().toString();
+        }
+        return defaultName;
     }
 }
