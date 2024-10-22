@@ -67,23 +67,15 @@ public class ElementFinder {
                     .attr("href"));
                 continue;
             }
-            if (row.get(1).text().contains("XML-схемы, используемые для формирования XML-документов – декларации об объекте")) {
-                final Elements a = row.get(2)
-                    .select("a");
-                fileDownloadUrls.add(a.get(0)
-                    .attr("href"));
-                fileDownloadUrls.add(a.get(1)
-                    .attr("href"));
-                continue;
-            }
 
             final Elements a = row.get(2)
                 .select("a");
             if (a.isEmpty()) {
                 continue;
             }
-            fileDownloadUrls.add(a.get(0)
-                .attr("href"));
+            fileDownloadUrls.addAll(a.stream()
+                .map(el -> el.attr("href"))
+                .toList());
         }
         return fileDownloadUrls;
     }
