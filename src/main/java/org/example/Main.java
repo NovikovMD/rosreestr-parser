@@ -14,20 +14,20 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static org.example.Configuration.trustAllCertificates;
-import static org.example.Constants.*;
+import static org.example.Constants.REFERRER;
+import static org.example.Constants.ROOT_URL;
+import static org.example.Constants.USER_AGENT;
 import static org.example.ElementFinder.getFileDownloadUrls;
 import static org.example.ElementFinder.getPageUrls;
 
 public class Main {
-    public static void main(String[] args) throws NoSuchAlgorithmException, KeyManagementException, IOException {
+    public static void main(String[] args) throws Exception {
         final SSLConnectionSocketFactory socketFactory = trustAllCertificates();
 
         final List<String> mainPageUrls;
@@ -40,21 +40,47 @@ public class Main {
 
         var counter = 0;
         for (final String pageUrl : mainPageUrls) {
-            final Document page;
-            try {
-                page = Jsoup.connect(ROOT_URL + pageUrl)
-                    .userAgent(USER_AGENT)
-                    .get();
-            } catch (IOException exception) {
-                System.err.printf("Ошибка подключения на страницу %s%n", pageUrl);
-                throw exception;
-            }
-
-            final List<String> fileDownloadUrls = getFileDownloadUrls(page);
-            downloadFiles(fileDownloadUrls, socketFactory);
+            final List<String> fileDownloadUrls = downloadFiles(pageUrl, socketFactory);
             counter += fileDownloadUrls.size();
         }
         System.out.println("Было загружено " + counter + " файлов");
+    }
+
+    private static List<String> downloadFiles(String pageUrl, SSLConnectionSocketFactory socketFactory) throws Exception {
+        byte repeater = 5;
+        Exception thrown = new RuntimeException("Какая-то неизвестная ошибка");
+        while (repeater > 0) {
+            try {
+                final Document page = getPage(pageUrl);
+
+                final List<String> fileDownloadUrls = getFileDownloadUrls(page);
+                downloadFiles(fileDownloadUrls, socketFactory);
+                return fileDownloadUrls;
+            } catch (Exception exception) {
+                thrown = exception;
+            }
+            repeater--;
+        }
+
+        System.err.printf("Ошибка работы со страницей %s%n", pageUrl);
+        throw thrown;
+    }
+
+    private static Document getPage(String pageUrl) throws Exception {
+        byte repeater = 5;
+        Exception thrown = new RuntimeException("Какая-то неизвестная ошибка");
+        while (repeater > 0) {
+            try {
+                return Jsoup.connect(ROOT_URL + pageUrl)
+                    .userAgent(USER_AGENT)
+                    .get();
+            } catch (IOException exception) {
+                thrown = exception;
+            }
+            repeater--;
+        }
+        System.err.printf("Ошибка подключения на страницу %s%n", pageUrl);
+        throw thrown;
     }
 
     private static void downloadFiles(List<String> fileUrls, SSLConnectionSocketFactory socketFactory) {
