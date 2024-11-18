@@ -10,7 +10,9 @@ import java.util.LinkedList;
 import java.util.List;
 
 import static java.util.stream.IntStream.range;
-import static org.example.Constants.*;
+import static org.example.Constants.MAIN_URL;
+import static org.example.Constants.REFERRER;
+import static org.example.Constants.USER_AGENT;
 
 public class ElementFinder {
     private ElementFinder() {
