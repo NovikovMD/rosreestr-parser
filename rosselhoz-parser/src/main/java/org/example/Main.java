@@ -1,5 +1,7 @@
 package org.example;
 
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -12,7 +14,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -37,18 +41,11 @@ public class Main {
             throw exception;
         }
 
-        var counter = 0;
-        for (final Element table : dataTables) {
-            final List<String> fileDownloadUrls = downloadFiles(table, socketFactory);
-            counter += fileDownloadUrls.size();
-        }
-        System.out.println("Было загружено " + counter + " файлов");
-    }
-
-    private static List<String> downloadFiles(Element page, SSLConnectionSocketFactory socketFactory) throws Exception {
-        final List<String> fileDownloadUrls = getDownloadUrls(page);
+        final List<String> fileDownloadUrls = dataTables.stream()
+            .flatMap(table -> getDownloadUrls(table).stream())
+            .toList();
         downloadFiles(fileDownloadUrls, socketFactory);
-        return fileDownloadUrls;
+        System.out.println("Было загружено " + fileDownloadUrls.size() + " файлов");
     }
 
     private static void downloadFiles(List<String> fileUrls, SSLConnectionSocketFactory socketFactory) throws Exception {
@@ -71,11 +68,12 @@ public class Main {
         if (!fileUrl.startsWith("http://") && !fileUrl.startsWith("https://")) {
             fileUrl = ROOT_URL + fileUrl.trim().replace(" ", "%20");
         }
+        Path path = null;
         try (CloseableHttpClient httpClient = HttpClients.custom()
             .setSSLSocketFactory(socketFactory)
             .build()) {
 
-            HttpGet request = new HttpGet(fileUrl);
+            final HttpGet request = new HttpGet(fileUrl);
             request.addHeader("User-Agent", USER_AGENT);
             request.addHeader("Accept", "application/octet-stream");
             request.addHeader("Referer", REFERRER);
@@ -84,8 +82,21 @@ public class Main {
                 final HttpEntity entity = response.getEntity();
                 final String fileName = getFileName(fileUrl, response, defaultFileName);
 
-                try (InputStream in = entity.getContent()) {
-                    Files.copy(in, Paths.get(fileName.replace("%2F", "_")), REPLACE_EXISTING);
+                try (final InputStream in = entity.getContent()) {
+                    path = Paths.get(fileName.replace("%2F", "_"));
+                    Files.copy(
+                        in,
+                        path,
+                        REPLACE_EXISTING);
+                }
+            }
+        }
+
+        if (path.getFileName().toString().toLowerCase().endsWith(".zip")) {
+            try (ZipFile zipFile = new ZipFile(path.toFile())) {
+                Enumeration<? extends ZipArchiveEntry> entries = zipFile.getEntries();
+                while (entries.hasMoreElements()) {
+                    ZipArchiveEntry entry = entries.nextElement();
                 }
             }
         }
