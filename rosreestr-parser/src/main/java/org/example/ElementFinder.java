@@ -6,6 +6,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -35,7 +36,11 @@ public class ElementFinder {
     public static List<String> getFileDownloadUrls(final Document page) {
         final List<String> fileDownloadUrls = new LinkedList<>();
 
-        final Elements tableData = page.select("table.MsoNormalTable")
+        final Elements select = page.select("table.MsoNormalTable");
+        if (select.isEmpty()) {
+            return Collections.emptyList();
+        }
+        final Elements tableData = select
             .get(0)
             .children()
             .get(0)

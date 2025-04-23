@@ -9,7 +9,7 @@
         <version>1.0</version>
     </parent>
 
-    <version>1.18</version>
+    <version>1.19</version>
     <artifactId>rosreestr-parser</artifactId>
 
     <properties>
