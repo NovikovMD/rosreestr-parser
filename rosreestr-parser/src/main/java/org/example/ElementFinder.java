@@ -19,11 +19,9 @@ public class ElementFinder {
     }
 
     public static Elements getSchemas(final Document mainPage) {
-        final Element areaObject = mainPage.select("div#reg_all_sections")
+        final Element areaObject = mainPage.select("div#reg_fallback_sections")
             .get(0);
-        final Element areaChildObject = areaObject.select("div[data-iblock-id='20']")
-            .get(0);
-        final Element listWithPageUrls = areaChildObject.select("ul")
+        final Element listWithPageUrls = areaObject.select("ul")
             .get(0);
         return listWithPageUrls.children();
     }
